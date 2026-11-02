@@ -15,29 +15,31 @@ from app.api.deps import get_current_user
 
 router = APIRouter()
 
+def get_month_date_range(year: int, month: int):
+    start_date = date(year, month, 1)
+    if month == 12:
+        end_date = date(year, 12, 31)
+    else:
+        end_date = date(year, month + 1, 1) - timedelta(days=1)
+    return start_date, end_date
+
 @router.get("/summary", response_model=DashboardSummary)
 def get_dashboard_summary(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     today = date.today()
-    start_of_month = date(today.year, today.month, 1)
+    start_of_month, end_of_month = get_month_date_range(today.year, today.month)
     
-    # Calculate current month's income & expenses
+    # Calculate current month's actual income & expenses
     txs = db.query(Transaction).filter(
         Transaction.user_id == current_user.id,
         Transaction.transaction_date >= start_of_month,
-        Transaction.transaction_date <= today
+        Transaction.transaction_date <= end_of_month
     ).all()
 
     income = sum(to_decimal(t.amount) for t in txs if t.transaction_type == "income")
     expenses = sum(to_decimal(t.amount) for t in txs if t.transaction_type == "expense")
-    
-    # If no transactions in current month, fallback to profile defaults if available
-    if income == Decimal("0.00") and expenses == Decimal("0.00") and current_user.profile:
-        if current_user.profile.monthly_income > Decimal("0.00"):
-            income = to_decimal(current_user.profile.monthly_income)
-            expenses = to_decimal(current_user.profile.essential_expenses + current_user.profile.discretionary_expenses)
 
     net_cash_flow = calculate_net_cash_flow(income, expenses)
     savings_rate = calculate_savings_rate(income, expenses)
@@ -76,7 +78,7 @@ def get_dashboard_cash_flow(
     points = []
     month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-    # Generate 6 trailing months
+    # Generate 6 trailing months strictly using verified transaction records
     for i in range(5, -1, -1):
         year = today.year
         month = today.month - i
@@ -84,11 +86,7 @@ def get_dashboard_cash_flow(
             month += 12
             year -= 1
 
-        start_date = date(year, month, 1)
-        if month == 12:
-            end_date = date(year, 12, 31)
-        else:
-            end_date = date(year, month + 1, 1) - timedelta(days=1)
+        start_date, end_date = get_month_date_range(year, month)
 
         txs = db.query(Transaction).filter(
             Transaction.user_id == current_user.id,
@@ -98,13 +96,6 @@ def get_dashboard_cash_flow(
 
         m_inc = sum(to_decimal(t.amount) for t in txs if t.transaction_type == "income")
         m_exp = sum(to_decimal(t.amount) for t in txs if t.transaction_type == "expense")
-
-        # If zero records in past historical month, supply smooth profile baseline for chart visualization
-        if m_inc == 0 and m_exp == 0 and current_user.profile and current_user.profile.monthly_income > 0:
-            base_inc = to_decimal(current_user.profile.monthly_income)
-            base_exp = to_decimal(current_user.profile.essential_expenses + current_user.profile.discretionary_expenses)
-            m_inc = base_inc * Decimal(str(0.85 + (5 - i) * 0.03))
-            m_exp = base_exp * Decimal(str(0.90 + (5 - i) * 0.02))
 
         points.append(CashFlowPoint(
             month=month_names[month - 1],
@@ -121,13 +112,13 @@ def get_dashboard_spending_breakdown(
     db: Session = Depends(get_db)
 ):
     today = date.today()
-    start_date = date(today.year, today.month, 1)
+    start_date, end_date = get_month_date_range(today.year, today.month)
 
     txs = db.query(Transaction).filter(
         Transaction.user_id == current_user.id,
         Transaction.transaction_type == "expense",
         Transaction.transaction_date >= start_date,
-        Transaction.transaction_date <= today
+        Transaction.transaction_date <= end_date
     ).all()
 
     cat_totals = {}

@@ -36,10 +36,38 @@ class CoordinatorAgent:
     def _get_financial_context(self) -> Dict[str, Any]:
         """Collects verified financial profile and state for contextual personalization."""
         prof = self.user.profile
-        monthly_income = to_decimal(prof.monthly_income) if prof and prof.monthly_income else Decimal("60000.00")
-        essential_exp = to_decimal(prof.essential_expenses) if prof and prof.essential_expenses else Decimal("25000.00")
-        disc_exp = to_decimal(prof.discretionary_expenses) if prof and prof.discretionary_expenses else Decimal("15000.00")
-        current_savings = to_decimal(prof.current_savings) if prof and prof.current_savings else Decimal("35000.00")
+        
+        # Calculate real actual transactions in current month
+        today = date.today()
+        start_of_month = date(today.year, today.month, 1)
+        month_txs = self.db.query(Transaction).filter(
+            Transaction.user_id == self.user.id,
+            Transaction.transaction_date >= start_of_month
+        ).all()
+        actual_month_inc = sum(to_decimal(t.amount) for t in month_txs if t.transaction_type == "income")
+        actual_month_exp = sum(to_decimal(t.amount) for t in month_txs if t.transaction_type == "expense")
+
+        # Determine monthly income: profile priority, then actual ledger, else 0
+        if prof and prof.monthly_income and prof.monthly_income > Decimal("0.00"):
+            monthly_income = to_decimal(prof.monthly_income)
+        elif actual_month_inc > Decimal("0.00"):
+            monthly_income = actual_month_inc
+        else:
+            monthly_income = Decimal("0.00")
+
+        # Determine essential and discretionary expenses
+        if prof and (prof.essential_expenses > 0 or prof.discretionary_expenses > 0):
+            essential_exp = to_decimal(prof.essential_expenses)
+            disc_exp = to_decimal(prof.discretionary_expenses)
+        elif actual_month_exp > Decimal("0.00"):
+            # Estimate 60% essential, 40% discretionary from ledger if not broken down
+            essential_exp = (actual_month_exp * Decimal("0.60")).quantize(Decimal("0.01"))
+            disc_exp = (actual_month_exp * Decimal("0.40")).quantize(Decimal("0.01"))
+        else:
+            essential_exp = Decimal("0.00")
+            disc_exp = Decimal("0.00")
+
+        current_savings = to_decimal(prof.current_savings) if prof and prof.current_savings else Decimal("0.00")
         committed_expenses = essential_exp + disc_exp
         surplus = monthly_income - committed_expenses
 

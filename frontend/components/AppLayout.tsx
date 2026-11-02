@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './AppHeader';
 import { ShieldCheck } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -14,6 +15,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, pageTitle, title, onSearchClick }: AppLayoutProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { user } = useAuth();
   const displayTitle = pageTitle || title || 'FinWise AI';
 
   return (
@@ -36,7 +38,9 @@ export function AppLayout({ children, pageTitle, title, onSearchClick }: AppLayo
               <ShieldCheck size={13} className="text-emerald-700 inline mr-1" />
               Your finances deserve clarity.
             </span>
-            <span className="footer-demo">DEMO · SAMPLE DATA ONLY</span>
+            {user?.email === 'demo@finwise.ai' && (
+              <span className="footer-demo">DEMO · SAMPLE DATA ONLY</span>
+            )}
           </footer>
         </div>
       </section>

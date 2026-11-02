@@ -48,6 +48,7 @@ export default function DashboardPage() {
   const [bills, setBills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   async function loadDashboardData() {
     try {
@@ -78,20 +79,36 @@ export default function DashboardPage() {
     loadDashboardData();
   }, []);
 
-  const totalIncome = summary?.total_income ?? 60500;
-  const totalExpenses = summary?.total_expenses ?? 15879;
+  const totalIncome = summary?.total_income ?? 0;
+  const totalExpenses = summary?.total_expenses ?? 0;
   const netCashFlow = summary?.net_cash_flow ?? (totalIncome - totalExpenses);
-  const savingsRate = summary?.savings_rate ?? (totalIncome > 0 ? Math.round((netCashFlow / totalIncome) * 100) : 0);
+  const rawSavingsRate = summary?.savings_rate ?? (totalIncome > 0 ? Math.round((netCashFlow / totalIncome) * 100) : 0);
+  const savingsRate = Math.max(0, rawSavingsRate);
 
-  const pieData =
-    spendingBreakdown.length > 0
-      ? spendingBreakdown.map((s) => ({ name: s.category_name, value: Number(s.amount), color: s.color }))
-      : [
-          { name: 'Housing', value: 12000, color: '#16845d' },
-          { name: 'Food & Groceries', value: 6350, color: '#4c83df' },
-          { name: 'Lifestyle', value: 3340, color: '#9b79d7' },
-          { name: 'Transport', value: 2180, color: '#e4a64c' },
-        ];
+  const pieData = spendingBreakdown.map((s) => ({
+    name: s.category_name,
+    value: Number(s.amount),
+    color: s.color || '#16A36A',
+  }));
+
+  async function handleExportReport() {
+    try {
+      setExporting(true);
+      const blob = await api.reports.exportCsv();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `finwise_report_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      alert(err.message || 'Failed to export report CSV.');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <AppLayout pageTitle="Financial Overview">
@@ -102,21 +119,20 @@ export default function DashboardPage() {
             <span className="eyebrow-dot" /> LIVE FINANCIAL OVERVIEW
           </div>
           <h1>
-            Welcome back, {user?.display_name || 'John Smith'}
+            Welcome back, {user?.display_name || 'User'}
             <span className="heading-period">.</span>
           </h1>
           <p className="page-sub">A verified, deterministic overview of your current cash flow and savings trajectory.</p>
         </div>
 
         <div className="head-actions">
-          <a
-            href={api.reports.getExportUrl()}
-            target="_blank"
-            rel="noreferrer"
-            className="button button-secondary no-underline"
+          <button
+            onClick={handleExportReport}
+            disabled={exporting}
+            className="button button-secondary"
           >
-            <Download size={16} /> Export Report
-          </a>
+            <Download size={16} /> {exporting ? 'Exporting...' : 'Export Report'}
+          </button>
           <button className="button button-primary" onClick={() => setShowAddModal(true)}>
             <Plus size={16} /> Add Transaction
           </button>
@@ -260,45 +276,53 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          <div className="donut-wrap">
-            <div className="donut-chart">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius="65%"
-                    outerRadius="90%"
-                    paddingAngle={3}
-                    stroke="none"
-                  >
-                    {pieData.map((d, idx) => (
-                      <Cell key={idx} fill={d.color || '#16A36A'} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v: any) => formatCurrency(Number(v))} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="donut-center">
-              <span>Total spent</span>
-              <strong>{formatCurrency(totalExpenses)}</strong>
-              <small>This month</small>
-            </div>
-          </div>
-
-          <div className="category-list">
-            {pieData.slice(0, 4).map((d) => (
-              <div className="category-row" key={d.name}>
-                <span className="category-name">
-                  <i style={{ background: d.color }} />
-                  {d.name}
-                </span>
-                <strong>{formatCurrency(d.value)}</strong>
+          {pieData.length > 0 ? (
+            <>
+              <div className="donut-wrap">
+                <div className="donut-chart">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius="65%"
+                        outerRadius="90%"
+                        paddingAngle={3}
+                        stroke="none"
+                      >
+                        {pieData.map((d, idx) => (
+                          <Cell key={idx} fill={d.color || '#16A36A'} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v: any) => formatCurrency(Number(v))} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="donut-center">
+                  <span>Total spent</span>
+                  <strong>{formatCurrency(totalExpenses)}</strong>
+                  <small>This month</small>
+                </div>
               </div>
-            ))}
-          </div>
+
+              <div className="category-list">
+                {pieData.slice(0, 4).map((d) => (
+                  <div className="category-row" key={d.name}>
+                    <span className="category-name">
+                      <i style={{ background: d.color }} />
+                      {d.name}
+                    </span>
+                    <strong>{formatCurrency(d.value)}</strong>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="py-12 text-center text-xs text-gray-500">
+              No expense transactions logged for this month.
+            </div>
+          )}
 
           <Link href="/transactions" className="text-link full-link no-underline">
             View all transactions <ArrowUpRight size={14} />

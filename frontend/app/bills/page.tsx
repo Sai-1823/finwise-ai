@@ -14,6 +14,8 @@ export default function BillsPage() {
   const [toast, setToast] = useState('');
 
   // Form states
+  const [categories, setCategories] = useState<any[]>([]);
+  const [categoryId, setCategoryId] = useState('');
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState('monthly');
@@ -39,6 +41,9 @@ export default function BillsPage() {
 
   useEffect(() => {
     loadBills();
+    api.categories.list('expense').then((cats) => {
+      setCategories(cats || []);
+    }).catch(console.error);
   }, []);
 
   async function handleSaveBill(e: React.FormEvent) {
@@ -50,12 +55,14 @@ export default function BillsPage() {
     }
 
     try {
+      const parsedCatId = categoryId ? parseInt(categoryId) : undefined;
       if (editBill) {
         await api.bills.update(editBill.id, {
           name: name.trim(),
           amount: numAmt,
           frequency,
           next_due_date: nextDueDate,
+          category_id: parsedCatId,
           notes: notes.trim() || null,
         });
         notify('Bill updated.');
@@ -66,6 +73,7 @@ export default function BillsPage() {
           frequency,
           next_due_date: nextDueDate,
           currency: 'INR',
+          category_id: parsedCatId,
           notes: notes.trim() || null,
         });
         notify('Recurring bill added.');
@@ -74,6 +82,7 @@ export default function BillsPage() {
       setEditBill(null);
       setName('');
       setAmount('');
+      setCategoryId('');
       setNextDueDate('');
       setNotes('');
       loadBills();
@@ -133,6 +142,7 @@ export default function BillsPage() {
               setEditBill(null);
               setName('');
               setAmount('');
+              setCategoryId('');
               setNextDueDate('');
               setNotes('');
               setShowCreateModal(true);
@@ -174,9 +184,16 @@ export default function BillsPage() {
                 >
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-white border border-gray-200 text-[#64748B]">
-                        {b.frequency}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-white border border-gray-200 text-[#64748B]">
+                          {b.frequency}
+                        </span>
+                        {b.category_name && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-100">
+                            {b.category_name}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => {
@@ -184,6 +201,7 @@ export default function BillsPage() {
                             setName(b.name);
                             setAmount(String(b.amount));
                             setFrequency(b.frequency);
+                            setCategoryId(b.category_id ? String(b.category_id) : '');
                             setNextDueDate(b.next_due_date);
                             setNotes(b.notes || '');
                             setShowCreateModal(true);
@@ -250,6 +268,22 @@ export default function BillsPage() {
                   className="w-full px-3 py-2 bg-white border border-[#D9E2DC] rounded-xl text-xs outline-none focus:border-[#16A36A]"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#64748B] mb-1">Expense Category (Optional)</label>
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-[#D9E2DC] rounded-xl text-xs outline-none"
+                >
+                  <option value="">Uncategorized</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

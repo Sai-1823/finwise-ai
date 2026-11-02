@@ -2,8 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Menu, Search, Bell, Activity } from 'lucide-react';
-import { UserButton, SignedIn, SignedOut } from '@clerk/nextjs';
+import { Menu, Search, Bell } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 
 interface AppHeaderProps {
@@ -31,9 +30,11 @@ export function AppHeader({ pageTitle, onOpenMobileNav, onSearchClick }: AppHead
       </div>
 
       <div className="top-actions">
-        <div className="demo-chip">
-          <span /> Sample data
-        </div>
+        {user?.email === 'demo@finwise.ai' && (
+          <div className="demo-chip">
+            <span /> Sample data
+          </div>
+        )}
 
         {onSearchClick && (
           <button
@@ -56,14 +57,9 @@ export function AppHeader({ pageTitle, onOpenMobileNav, onSearchClick }: AppHead
           <i />
         </button>
 
-        <SignedIn>
-          <UserButton afterSignOutUrl="/login" />
-        </SignedIn>
-        <SignedOut>
-          <Link href="/settings/profile" className="top-avatar no-underline" title="Profile Settings">
-            {user?.display_name ? user.display_name[0].toUpperCase() : 'U'}
-          </Link>
-        </SignedOut>
+        <Link href="/settings/profile" className="top-avatar no-underline" title="Profile Settings">
+          {user?.display_name ? user.display_name[0].toUpperCase() : 'U'}
+        </Link>
       </div>
     </header>
   );

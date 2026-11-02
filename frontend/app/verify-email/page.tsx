@@ -4,6 +4,7 @@ import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, MailCheck, ArrowLeft } from 'lucide-react';
+import { useSignUp } from '@clerk/nextjs';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import AuthShell from '@/components/auth/AuthShell';
@@ -14,6 +15,7 @@ import { ErrorAlert, SuccessAlert } from '@/components/auth/Alert';
 function VerifyEmailForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const { isLoaded, signUp, setActive } = useSignUp();
   const { verifyEmail } = useAuth();
   const email = (params.get('email') || '').trim();
 
@@ -28,11 +30,29 @@ function VerifyEmailForm() {
     setError('');
     setNotice('');
     setLoading(true);
+
     try {
-      await verifyEmail(email, value);
-      router.push('/onboarding');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Verification failed. Please try again.');
+      if (isLoaded && signUp) {
+        const completeSignUp = await signUp.attemptEmailAddressVerification({
+          code: value.trim(),
+        });
+        if (completeSignUp.status === 'complete') {
+          await setActive({ session: completeSignUp.createdSessionId });
+          router.push('/onboarding');
+          return;
+        } else {
+          setError(`Verification status: ${completeSignUp.status}. Please check your code.`);
+        }
+      } else {
+        await verifyEmail(email, value);
+        router.push('/onboarding');
+      }
+    } catch (err: any) {
+      const msg =
+        err?.errors?.[0]?.longMessage ||
+        err?.errors?.[0]?.message ||
+        (err instanceof Error ? err.message : 'Verification failed. Please try again.');
+      setError(msg);
       setCode('');
     } finally {
       setLoading(false);
@@ -48,11 +68,21 @@ function VerifyEmailForm() {
   async function resend() {
     setError('');
     try {
-      await api.auth.resendCode({ email, purpose: 'signup' });
-      setNotice('If that email is waiting for verification, a new code is on its way.');
-      cooldown.start(60);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Could not resend the code.');
+      if (isLoaded && signUp) {
+        await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+        setNotice('A fresh 6-digit verification code has been dispatched to your email.');
+        cooldown.start(60);
+      } else {
+        await api.auth.resendCode({ email, purpose: 'signup' });
+        setNotice('If that email is waiting for verification, a new code is on its way.');
+        cooldown.start(60);
+      }
+    } catch (err: any) {
+      const msg =
+        err?.errors?.[0]?.longMessage ||
+        err?.errors?.[0]?.message ||
+        (err instanceof Error ? err.message : 'Could not resend the code.');
+      setError(msg);
     }
   }
 
@@ -87,7 +117,7 @@ function VerifyEmailForm() {
         type="button"
         onClick={() => submit(code)}
         disabled={loading || code.length !== 6}
-        className="w-full bg-[#16A36A] hover:bg-[#128A58] disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+        className="w-full bg-[#16A36A] hover:bg-[#128A58] disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
       >
         {loading ? (
           <>
@@ -105,7 +135,7 @@ function VerifyEmailForm() {
             type="button"
             onClick={resend}
             disabled={cooldown.left > 0}
-            className="text-[#16A36A] font-bold hover:underline disabled:text-[#94A3B8] disabled:no-underline"
+            className="text-[#16A36A] font-bold hover:underline disabled:text-[#94A3B8] disabled:no-underline cursor-pointer"
           >
             {cooldown.left > 0 ? `resend in ${cooldown.left}s` : 'resend the code'}
           </button>

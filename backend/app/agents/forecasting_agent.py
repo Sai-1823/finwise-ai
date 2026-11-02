@@ -22,7 +22,7 @@ class ForecastingAgent:
         """
         # Fetch profile
         prof = self.db.query(FinancialProfile).filter(FinancialProfile.user_id == self.user_id).first()
-        income = profile_income or (to_decimal(prof.monthly_income) if prof else Decimal("50000.00"))
+        income = profile_income or (to_decimal(prof.monthly_income) if prof and prof.monthly_income else Decimal("0.00"))
         
         # Fetch upcoming bills
         bills = self.db.query(RecurringBill).filter(
@@ -32,8 +32,8 @@ class ForecastingAgent:
         upcoming_bills_total = sum(to_decimal(b.amount) for b in bills)
 
         # Essential expenses
-        essentials = to_decimal(prof.essential_expenses) if prof else Decimal("20000.00")
-        current_savings = to_decimal(prof.current_savings) if prof else Decimal("30000.00")
+        essentials = to_decimal(prof.essential_expenses) if prof and prof.essential_expenses else Decimal("0.00")
+        current_savings = to_decimal(prof.current_savings) if prof and prof.current_savings else Decimal("0.00")
 
         # Discretionary surplus
         committed_monthly = essentials + upcoming_bills_total

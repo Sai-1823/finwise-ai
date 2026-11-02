@@ -1,3 +1,4 @@
+import calendar
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import List
@@ -50,6 +51,14 @@ def create_recurring_bill(
 ):
     if data.amount <= Decimal("0.00"):
         raise HTTPException(status_code=400, detail="Amount must be strictly positive.")
+
+    if data.category_id:
+        cat = db.query(Category).filter(
+            Category.id == data.category_id,
+            (Category.user_id == current_user.id) | (Category.user_id == None)
+        ).first()
+        if not cat:
+            raise HTTPException(status_code=400, detail="Invalid category ID.")
 
     bill = RecurringBill(
         user_id=current_user.id,
@@ -105,6 +114,14 @@ def update_recurring_bill(
         bill.status = data.status
     if data.notes is not None:
         bill.notes = data.notes
+    if data.category_id is not None:
+        cat = db.query(Category).filter(
+            Category.id == data.category_id,
+            (Category.user_id == current_user.id) | (Category.user_id == None)
+        ).first()
+        if not cat:
+            raise HTTPException(status_code=400, detail="Invalid category ID.")
+        bill.category_id = data.category_id
 
     db.commit()
     db.refresh(bill)
@@ -170,14 +187,23 @@ def mark_bill_paid(
     if bill.frequency == "weekly":
         bill.next_due_date = old_date + timedelta(days=7)
     elif bill.frequency == "quarterly":
-        # ~3 months
-        bill.next_due_date = old_date + timedelta(days=90)
+        # Advance 3 months safely
+        target_month = old_date.month + 3
+        target_year = old_date.year + ((target_month - 1) // 12)
+        norm_month = ((target_month - 1) % 12) + 1
+        max_d = calendar.monthrange(target_year, norm_month)[1]
+        bill.next_due_date = date(target_year, norm_month, min(old_date.day, max_d))
     elif bill.frequency == "yearly":
-        bill.next_due_date = date(old_date.year + 1, old_date.month, old_date.day)
+        # Handle leap year Feb 29 safely
+        try:
+            bill.next_due_date = date(old_date.year + 1, old_date.month, old_date.day)
+        except ValueError:
+            bill.next_due_date = date(old_date.year + 1, old_date.month, 28)
     else:  # monthly
         year = old_date.year + (old_date.month // 12)
         month = (old_date.month % 12) + 1
-        bill.next_due_date = date(year, month, min(old_date.day, 28))
+        max_d = calendar.monthrange(year, month)[1]
+        bill.next_due_date = date(year, month, min(old_date.day, max_d))
 
     bill.status = "upcoming"
 

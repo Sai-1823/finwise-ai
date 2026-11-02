@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Plus, Save } from 'lucide-react';
 import { api } from '@/lib/api';
 
@@ -16,9 +16,21 @@ export function TransactionModal({ isOpen, onClose, onSuccess, initialData }: Tr
   const [description, setDescription] = useState(initialData?.description || '');
   const [amount, setAmount] = useState(initialData?.amount ? String(initialData.amount) : '');
   const [txDate, setTxDate] = useState(initialData?.transaction_date || new Date().toISOString().split('T')[0]);
+  const [categoryId, setCategoryId] = useState<string>(initialData?.category_id ? String(initialData.category_id) : '');
+  const [categories, setCategories] = useState<Array<{ id: number; name: string; transaction_type: string }>>([]);
   const [notes, setNotes] = useState(initialData?.notes || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      api.categories.list(type).then((cats) => {
+        setCategories(cats || []);
+      }).catch(() => {
+        setCategories([]);
+      });
+    }
+  }, [isOpen, type]);
 
   if (!isOpen) return null;
 
@@ -34,12 +46,14 @@ export function TransactionModal({ isOpen, onClose, onSuccess, initialData }: Tr
 
     setIsSubmitting(true);
     try {
+      const parsedCatId = categoryId ? parseInt(categoryId) : null;
       if (initialData?.id) {
         await api.transactions.update(initialData.id, {
           description: description.trim(),
           amount: numAmt,
           transaction_type: type,
           transaction_date: txDate,
+          category_id: parsedCatId,
           notes: notes.trim() || null,
         });
       } else {
@@ -49,6 +63,7 @@ export function TransactionModal({ isOpen, onClose, onSuccess, initialData }: Tr
           transaction_type: type,
           transaction_date: txDate,
           currency: 'INR',
+          category_id: parsedCatId,
           notes: notes.trim() || null,
         });
       }
@@ -86,14 +101,20 @@ export function TransactionModal({ isOpen, onClose, onSuccess, initialData }: Tr
             <button
               type="button"
               className={type === 'expense' ? 'selected' : ''}
-              onClick={() => setType('expense')}
+              onClick={() => {
+                setType('expense');
+                setCategoryId('');
+              }}
             >
               Expense
             </button>
             <button
               type="button"
               className={type === 'income' ? 'selected income-selected' : ''}
-              onClick={() => setType('income')}
+              onClick={() => {
+                setType('income');
+                setCategoryId('');
+              }}
             >
               Income
             </button>
@@ -121,6 +142,21 @@ export function TransactionModal({ isOpen, onClose, onSuccess, initialData }: Tr
             placeholder="0.00"
             required
           />
+
+          <label htmlFor="tx-category">Category</label>
+          <select
+            id="tx-category"
+            className="form-input bg-white"
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+          >
+            <option value="">Uncategorized</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
 
           <label htmlFor="tx-date">Date</label>
           <input

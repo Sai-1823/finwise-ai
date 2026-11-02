@@ -39,6 +39,7 @@ export default function TransactionsPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
   const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -83,6 +84,25 @@ export default function TransactionsPage() {
     }
   }
 
+  async function handleExportCsv() {
+    try {
+      setExporting(true);
+      const csvBlob = await api.transactions.exportCsv();
+      const url = window.URL.createObjectURL(csvBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transactions_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      alert(err.message || 'Failed to export CSV.');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -117,14 +137,13 @@ export default function TransactionsPage() {
         </div>
 
         <div className="head-actions">
-          <a
-            href={api.transactions.getExportUrl()}
-            target="_blank"
-            rel="noreferrer"
-            className="button button-secondary no-underline"
+          <button
+            onClick={handleExportCsv}
+            disabled={exporting}
+            className="button button-secondary"
           >
-            <Download size={15} /> Export CSV
-          </a>
+            <Download size={15} /> {exporting ? 'Exporting...' : 'Export CSV'}
+          </button>
           <button className="button button-secondary" onClick={() => setShowImportModal(true)}>
             <Upload size={15} /> Import CSV
           </button>

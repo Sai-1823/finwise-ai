@@ -127,6 +127,21 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    changePassword: (data: any) =>
+      request<{ message: string }>("/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+  },
+
+  categories: {
+    list: (type?: string) =>
+      request<any[]>(`/categories${type ? `?category_type=${type}` : ""}`),
+    create: (data: { name: string; category_type: string; icon?: string; color?: string }) =>
+      request<any>("/categories", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
   },
 
   onboarding: {
@@ -189,7 +204,7 @@ export const api = {
       }),
     getExportUrl: () => `${API_BASE}/transactions/export`,
     exportCsv: async () => {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const token = getToken();
       const res = await fetch(`${API_BASE}/transactions/export`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -353,6 +368,14 @@ export const api = {
       return request<any>(`/reports/annual?${qs.toString()}`);
     },
     getExportUrl: () => `${API_BASE}/reports/export`,
+    exportCsv: async () => {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/reports/export`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to export report CSV");
+      return await res.blob();
+    },
   },
 
   settings: {

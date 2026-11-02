@@ -16,7 +16,8 @@ export default function BudgetsPage() {
   const [toast, setToast] = useState('');
 
   // Form states
-  const [categoryId, setCategoryId] = useState('1');
+  const [categories, setCategories] = useState<any[]>([]);
+  const [categoryId, setCategoryId] = useState('');
   const [limitAmount, setLimitAmount] = useState('');
   const [warningThreshold, setWarningThreshold] = useState('80');
 
@@ -39,6 +40,13 @@ export default function BudgetsPage() {
 
   useEffect(() => {
     loadBudgets();
+    api.categories.list('expense').then((cats) => {
+      const expenseCats = cats || [];
+      setCategories(expenseCats);
+      if (expenseCats.length > 0) {
+        setCategoryId(String(expenseCats[0].id));
+      }
+    }).catch(console.error);
   }, []);
 
   async function handleCopyPrevious() {
@@ -60,6 +68,14 @@ export default function BudgetsPage() {
     if (isNaN(numLimit) || numLimit <= 0) {
       alert('Please enter a valid positive limit.');
       return;
+    }
+
+    if (!editBudget) {
+      const parsedCat = parseInt(categoryId);
+      if (isNaN(parsedCat) || parsedCat <= 0) {
+        alert('Please select a valid expense category.');
+        return;
+      }
     }
 
     try {
@@ -136,6 +152,9 @@ export default function BudgetsPage() {
             onClick={() => {
               setEditBudget(null);
               setLimitAmount('');
+              if (categories.length > 0 && !categoryId) {
+                setCategoryId(String(categories[0].id));
+              }
               setShowCreateModal(true);
             }}
           >
@@ -283,15 +302,17 @@ export default function BudgetsPage() {
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
                     className="w-full px-3 py-2 bg-white border border-[#D9E2DC] rounded-xl text-xs outline-none"
+                    required
                   >
-                    <option value="3">Housing</option>
-                    <option value="4">Food & Groceries</option>
-                    <option value="5">Transport</option>
-                    <option value="6">Lifestyle</option>
-                    <option value="7">Subscriptions</option>
-                    <option value="8">Healthcare</option>
-                    <option value="9">Utilities</option>
-                    <option value="10">Other</option>
+                    {categories.length > 0 ? (
+                      categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">No categories available</option>
+                    )}
                   </select>
                 </div>
               )}

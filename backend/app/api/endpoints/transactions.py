@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc
 
 from app.core.database import get_db
-from app.models.models import User, Transaction, Category, AuditEvent
+from app.models.models import User, Transaction, Category, Account, AuditEvent
 from app.schemas.schemas import TransactionCreate, TransactionUpdate, TransactionOut, CsvImportResult
 from app.api.deps import get_current_user
 from app.services.calculations import to_decimal
@@ -94,6 +94,15 @@ def create_transaction(
         ).first()
         if not cat:
             raise HTTPException(status_code=400, detail="Invalid category ID.")
+
+    # Validate account ownership if provided (prevent IDOR)
+    if data.account_id:
+        acc = db.query(Account).filter(
+            Account.id == data.account_id,
+            Account.user_id == current_user.id
+        ).first()
+        if not acc:
+            raise HTTPException(status_code=400, detail="Invalid account ID.")
 
     tx = Transaction(
         user_id=current_user.id,
