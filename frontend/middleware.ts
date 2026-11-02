@@ -13,6 +13,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/v1(.*)',
   '/sign-in(.*)',
   '/sign-up(.*)',
+  '/sso-callback(.*)',
 ]);
 
 export default function middleware(request: any, event: any) {

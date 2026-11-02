@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Mail, User, ArrowRight, Loader2, ShieldCheck, MailCheck, ArrowLeft } from 'lucide-react';
-import { useSignUp } from '@clerk/nextjs';
+import { useSignUp, useUser } from '@clerk/nextjs';
 import { useAuth } from '@/lib/auth-context';
 import AuthShell from '@/components/auth/AuthShell';
-import { PasswordField, PasswordStrength, passwordIsStrong } from '@/components/auth/PasswordField';
+import { PasswordField, PasswordStrength } from '@/components/auth/PasswordField';
 import { ErrorAlert, SuccessAlert } from '@/components/auth/Alert';
 import OtpInput from '@/components/auth/OtpInput';
 import { useCooldown } from '@/components/auth/useCooldown';
@@ -15,7 +15,15 @@ import { useCooldown } from '@/components/auth/useCooldown';
 export default function RegisterPage() {
   const router = useRouter();
   const { isLoaded, signUp, setActive } = useSignUp();
+  const { isSignedIn, isLoaded: userLoaded } = useUser();
   const { register } = useAuth();
+
+  // If already authenticated in Clerk, redirect to dashboard
+  useEffect(() => {
+    if (userLoaded && isSignedIn) {
+      router.push('/dashboard');
+    }
+  }, [userLoaded, isSignedIn, router]);
 
   // Form states
   const [name, setName] = useState('');
@@ -32,16 +40,25 @@ export default function RegisterPage() {
   const [code, setCode] = useState('');
   const cooldown = useCooldown(0);
 
-  const strong = passwordIsStrong(password);
   const matches = password.length > 0 && password === confirm;
 
-  async function handleRegister(e: React.FormEvent) {
-    e.preventDefault();
+  // Auto-submit verification code once 6 digits are typed
+  useEffect(() => {
+    if (pendingVerification && code.trim().length === 6 && !loading) {
+      handleVerifyCode();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, pendingVerification]);
+
+  async function handleRegister(e?: React.FormEvent | React.MouseEvent) {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
     if (loading) return;
     setError('');
     setNotice('');
 
-    // Explicit validation checks with informative error feedback
+    // Field-level validation checks
     if (!name.trim()) {
       setError('Please enter your full name.');
       return;
@@ -54,11 +71,15 @@ export default function RegisterPage() {
       setError('Please create a password.');
       return;
     }
-    if (!strong) {
-      setError('Please choose a stronger password that meets all 5 requirements listed below.');
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long.');
       return;
     }
-    if (!matches) {
+    if (!confirm) {
+      setError('Please confirm your password.');
+      return;
+    }
+    if (password !== confirm) {
       setError('The two passwords do not match. Please ensure both fields are identical.');
       return;
     }
@@ -66,13 +87,19 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      if (isLoaded && signUp) {
+      if (!isLoaded) {
+        setError('Authentication service is still initializing. Please wait a moment and try again.');
+        setLoading(false);
+        return;
+      }
+
+      if (signUp) {
         // Clerk Sign-Up Flow
         const nameParts = name.trim().split(/\s+/);
         const firstName = nameParts[0] || '';
         const lastName = nameParts.slice(1).join(' ') || undefined;
 
-        await signUp.create({
+        const signUpAttempt = await signUp.create({
           emailAddress: email.trim(),
           password,
           firstName: firstName || undefined,
@@ -83,10 +110,21 @@ export default function RegisterPage() {
           },
         });
 
+        if (signUpAttempt.status === 'complete') {
+          await setActive({ session: signUpAttempt.createdSessionId });
+          router.push('/onboarding');
+          return;
+        }
+
         // Send the 6-digit email verification code
-        await signUp.prepareEmailAddressVerification({
-          strategy: 'email_code',
-        });
+        try {
+          await signUp.prepareEmailAddressVerification({
+            strategy: 'email_code',
+          });
+        } catch (prepErr) {
+          // If Clerk already prepared verification automatically during signUp.create(), proceed safely
+          console.warn('prepareEmailAddressVerification note:', prepErr);
+        }
 
         setPendingVerification(true);
         setNotice('A 6-digit confirmation code has been dispatched to your email.');
@@ -97,18 +135,24 @@ export default function RegisterPage() {
         router.push(`/verify-email?email=${encodeURIComponent(email.trim())}&sent=1`);
       }
     } catch (err: any) {
+      console.error('Registration error:', err);
+      const code = err?.errors?.[0]?.code;
       const msg =
-        err?.errors?.[0]?.longMessage ||
-        err?.errors?.[0]?.message ||
-        (err instanceof Error ? err.message : 'Registration failed. Please check your credentials and try again.');
+        code === 'form_identifier_exists'
+          ? 'An account with this email address already exists. Please sign in instead.'
+          : err?.errors?.[0]?.longMessage ||
+            err?.errors?.[0]?.message ||
+            (err instanceof Error ? err.message : 'Registration failed. Please check your credentials and try again.');
       setError(msg);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleVerifyCode(e?: React.FormEvent) {
-    if (e) e.preventDefault();
+  async function handleVerifyCode(e?: React.FormEvent | React.MouseEvent) {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
     if (loading) return;
 
     if (code.trim().length !== 6) {
@@ -212,7 +256,7 @@ export default function RegisterPage() {
 
       {pendingVerification ? (
         /* STEP 2: 6-Digit Email Code Verification */
-        <form onSubmit={handleVerifyCode} className="space-y-5">
+        <form onSubmit={handleVerifyCode} className="space-y-5" noValidate>
           <div className="flex items-center gap-3 py-1">
             <div className="h-11 w-11 rounded-full bg-[#DDF8E8] text-[#16A36A] flex items-center justify-center shrink-0">
               <MailCheck size={22} />
@@ -226,8 +270,9 @@ export default function RegisterPage() {
 
           <button
             type="submit"
+            onClick={handleVerifyCode}
             disabled={loading || code.trim().length !== 6}
-            className="w-full bg-[#16A36A] hover:bg-[#128A58] disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full bg-[#16A36A] hover:bg-[#128A58] disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer relative z-10"
           >
             {loading ? (
               <>
@@ -350,9 +395,11 @@ export default function RegisterPage() {
             </div>
 
             <button
+              id="create-account-btn"
               type="submit"
+              onClick={handleRegister}
               disabled={loading}
-              className="w-full bg-[#16A36A] hover:bg-[#128A58] disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full bg-[#16A36A] hover:bg-[#128A58] disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer relative z-10"
             >
               {loading ? (
                 <>
@@ -380,7 +427,7 @@ export default function RegisterPage() {
             type="button"
             onClick={handleGoogleSignUp}
             disabled={loading}
-            className="w-full bg-white hover:bg-gray-50 border border-[#D9E2DC] text-[#10251D] py-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full bg-white hover:bg-gray-50 border border-[#D9E2DC] text-[#10251D] py-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer relative z-10"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
