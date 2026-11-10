@@ -12,7 +12,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
-        value: https://finwise-ai-frontend.onrender.com
+        value: https://finwise-ai-pearl.vercel.app
       - key: APP_ENV
         value: production
       # Email delivery for sign-up and password-reset codes. Set ONE provider in the Render dashboard.

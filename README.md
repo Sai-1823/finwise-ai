@@ -1,6 +1,13 @@
 # FinWise AI
 ### Production-Oriented AI-Powered Personal Financial Planning Platform
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-finwise--ai--pearl.vercel.app-000000.svg?style=for-the-badge&logo=vercel)](https://finwise-ai-pearl.vercel.app/)
+[![Backend API](https://img.shields.io/badge/Backend%20API-Render%20Live-009688.svg?style=for-the-badge&logo=render)](https://finwise-ai-93mc.onrender.com)
+
+> 🌐 **Live Website Deployment:** [https://finwise-ai-pearl.vercel.app/](https://finwise-ai-pearl.vercel.app/)  
+> ⚡ **Live Production Backend API:** [https://finwise-ai-93mc.onrender.com](https://finwise-ai-93mc.onrender.com)  
+> 🛡️ **Instant Demo Login:** Click the one-click **"Demo Account"** button on the sign-in screen, or use `demo@finwise.ai` with password `Demo1234!`
+
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
 [![Next.js 14](https://img.shields.io/badge/Frontend-Next.js%2014-000000.svg?style=flat&logo=nextdotjs)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6.svg?style=flat&logo=typescript)](https://www.typescriptlang.org)
@@ -11,6 +18,18 @@
 FinWise AI is an intelligent financial planning platform built for individuals, students, young professionals, and households. It combines deterministic personal finance math, an interactive ledger dashboard, and an orchestrated multi-agent AI assistant to deliver transparent, actionable financial insights.
 
 Initially optimized for Indian users with Indian Rupee formatting (`₹`, `en-IN`), the application is architected for extensible multi-currency and global localization.
+
+---
+
+## 🚀 Live Deployments & Instant Access
+
+- 🌐 **Web Application (Vercel):** [https://finwise-ai-pearl.vercel.app/](https://finwise-ai-pearl.vercel.app/)
+- ⚡ **Backend API (Render):** [https://finwise-ai-93mc.onrender.com](https://finwise-ai-93mc.onrender.com)
+- 📖 **Interactive API Documentation:** [https://finwise-ai-93mc.onrender.com/docs](https://finwise-ai-93mc.onrender.com/docs)
+- 🔑 **Pre-configured Demo Account:**
+  - Email: `demo@finwise.ai`
+  - Password: `Demo1234!`
+  *(Or click the one-click **"Demo Account"** button directly on the login page)*
 
 ---
 

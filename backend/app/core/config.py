@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "noreply@finwise.ai")
     SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "FinWise AI Security")
     SMTP_TLS: bool = os.getenv("SMTP_TLS", "true").lower() in ("1", "true", "yes")
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://finwise-ai-demo.vercel.app")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://finwise-ai-pearl.vercel.app")
 
     # HTTPS email APIs (recommended on hosts that block SMTP ports, e.g. Render free tier).
     BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
@@ -54,6 +54,7 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000",
+        "https://finwise-ai-pearl.vercel.app",
     ]
     # Extra allowed origins, comma separated (your Vercel / custom domain)
     EXTRA_CORS_ORIGINS: str = os.getenv("EXTRA_CORS_ORIGINS", "")
